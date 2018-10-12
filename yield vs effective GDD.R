@@ -6,6 +6,7 @@ graphics.off()
 library(coda)
 library(mcmc)
 library(batchmeans)
+library(spgs)
 
 textrm1<-as.matrix(read.table("USC00365915.dly",header=FALSE))
 row<-dim(textrm1)[1]
@@ -374,28 +375,30 @@ quantile(A,c(0.025,0.975)) #confidence interval from bootstrap
 
 #MCMC
 #data to use are yield~GDD+EDD+EDD_sqr
-model <- function(parm,x,y,z){ # Inputs are parameters and length of data
+model <- function(parm,w,x,y,z){ # Inputs are parameters and length of data
   model.p <- length(parm) # number of parameters in the physical model
   gdd <- parm[1]
-  edd <- parm[2]
-  edd_sqr <- parm[3]
-  ymean <- parm[4]
-  y.mod <- gdd*x + edd*y + edd_sqr*z + ymean # This linear equation represents the physical model
+  gdd_sqr<-parm[2]
+  edd <- parm[3]
+  edd_sqr <- parm[4]
+  ymean <- parm[5]
+  y.mod <- gdd*w + gdd_sqr*x + edd*y + edd_sqr*z + ymean # This linear equation represents the physical model
   return(list(mod.obs = y.mod, model.p = model.p))
 }
 
 observations <- yielddata[ ,1]
-parnames<-c("GDD","EDD","EDD_sqr","yield mean","sigma")
+parnames<-c("GDD","GDD_sqr","EDD","EDD_sqr","yield mean","sigma")
+set.seed(1)
 #initial guess GDD, EDD, EDD^2, yield mean, sigma
-p0<-c(0.035,-0.29,-0.003,2,1)
-p<-c(0.04,-0.25,-0.004,1.5,0.8)
+p0<-c(0.04,0,-0.35,-0.003,2,1)
+p<-c(0.04,0,-0.25,-0.004,1.5,0.8)
 # Load the likelihood model for measurement errors
 source("my_iid_obs_likelihood.R")
-step <- c(0.001, 0.001, 0.0001, 0.05, 0.001)
-NI <- 4000
-model.p<-4
-bound.lower<-c(0.02,-0.4,-0.0034,-1,0)
-bound.upper<-c(0.05,-0.25,-0.0022,4,2)
+step <- c(0.002, 0.00000001, 0.007, 0.0001, 0.16, 0.001)
+NI <- 5000
+model.p<-5
+bound.lower<-c(0.02,-0.00002,-0.4,-0.0034,-1,0)
+bound.upper<-c(0.05,0.00016,-0.25,-0.0022,4,2)
 mcmc.out <- metrop(log.post, p0, nbatch = NI, scale = step)
 prechain <- mcmc.out$batch
 # Print the acceptance rate as a percent.
@@ -409,3 +412,76 @@ for(i in 1:4){
   plot(mcmc.chains[ ,i], type="l", main = "",
        ylab = paste('Parameter = ', parnames[i], sep = ''), xlab = "Number of Runs")
 }
+
+
+bm_est <- bmmat(mcmc.chains)
+print(bm_est)
+z <-
+  half_width <- rep(NA, length(parnames))
+interval <- matrix(data = NA, nrow = 6, ncol = 2,
+                   dimnames = list(c(1:6), c("lower_bound", "upper_bound")))
+for(i in 1:length(parnames)){
+  z[i] <- (mean(mcmc.chains[,i]) - bm_est[i ,"est"])/bm_est[i ,"se"]
+  half_width[i] <- z[i] * bm_est[i ,"se"]
+  interval[i,1] <- bm_est[i ,"est"] - half_width[i]
+  interval[i,2] <- bm_est[i ,"est"] + half_width[i]
+}
+print(interval)
+
+heidel.diag(mcmc.chains, eps = 0.1, pvalue = 0.05)
+
+## Check #4: Gelman and Rubin's convergence diagnostic:
+set.seed(100)
+p0 <- c(0.03,0,-0.31,-0.0025,3,1.1) # Arbitrary choice.
+mcmc.out2 <- metrop(log.post, p0, nbatch=NI, scale=step)
+prechain2 <- mcmc.out2$batch
+set.seed(158)
+p0 <- c(0.033,0,-0.37,-0.0033,2.5,0.4) # Arbitrary choice.
+mcmc.out3 <- metrop(log.post, p0, nbatch=NI, scale=step)
+prechain3 <- mcmc.out3$batch
+set.seed(123)
+p0 <- c(0.042,0,-0.33,-0.0028,1.8,0.7) # Arbitrary choice.
+mcmc.out4 <- metrop(log.post, p0, nbatch=NI, scale=step)
+prechain4 <- mcmc.out4$batch
+# The burn-in has already been subtracted from the first chain.
+# Thus, the burn-in only needs to be subtracted from the three other
+# chains at this point.
+mcmc1 <- as.mcmc(mcmc.chains)
+mcmc2 <- as.mcmc(prechain2[-burnin, ])
+mcmc3 <- as.mcmc(prechain3[-burnin, ])
+mcmc4 <- as.mcmc(prechain4[-burnin, ])
+set.seed(1) # revert back to original seed
+mcmc_chain_list <- mcmc.list(list(mcmc1, mcmc2, mcmc3, mcmc4))
+gelman.diag(mcmc_chain_list)
+gelman.plot(mcmc_chain_list)
+
+
+# Calculate the 90% highest posterior density CI.
+# HPDinterval() requires an mcmc object; this was done in the code block above.
+mcmc1 <- as.mcmc(mcmc.chains)
+hpdi = HPDinterval(mcmc1, prob = 0.90)
+# Create density plot of each parameter.
+par(mfrow = c(2,2))
+for(i in 1:4){
+  # Create density plot.
+  p.dens = density(mcmc.chains[,i])
+  plot(p.dens, xlab = paste('Parameter =',' ', parnames[i], sep = ''), main="")
+  # Add mean estimate.
+  abline(v = bm(mcmc.chains[,i])$est, lwd = 2)
+  # Add 90% equal-tail CI.
+  CI = quantile(mcmc.chains[,i], prob = c(0.05, 0.95))
+  lines(x = CI, y = rep(0, 2), lwd = 2)
+  points(x = CI, y = rep(0, 2), pch = 16)
+  # Add 90% highest posterior density CI.
+  lines(x = hpdi[i, ], y = rep(mean(p.dens$y), 2), lwd = 2, col = "red")
+  points(x = hpdi[i, ], y = rep(mean(p.dens$y), 2), pch = 16, col = "red")
+}
+
+true_model<-bm_est[1, 1]*yielddata[ ,2]+bm_est[2,1]*yielddata[ ,3]+bm_est[3,1]*yielddata[ ,5]+bm_est[4,1]*yielddata[6]+bm_est[5,1]
+res<-yielddata[ ,1]-true_model
+par(mfrow = c(1,1))
+plot(density(res[ ,1]),xlab = "residual between model and observation",ylab = "density",main = "Residual distribution")
+x<-seq(-40,40,length=801)
+y<-dnorm(x,0.08185,14.45153)
+lines(x,y,col="red")
+shapiro.test(res[ ,1])
