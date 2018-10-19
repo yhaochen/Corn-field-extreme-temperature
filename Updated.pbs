@@ -1,0 +1,23 @@
+#PBS -l nodes=1:ppn=1
+#PBS -l walltime=00:10:00
+#PBS -M hxy46@psu.edu
+#PBS -m abe
+#PBS -l mem=1GB
+#PBS -j oe
+#PBS -A open
+
+
+cd /storage/home/hxy46/work/Workshop/
+echo " "
+echo " "
+echo "Job started on `hostname` at `date`"
+
+module load r/3.4
+Rscript Test.R
+
+STOP
+echo " "
+echo "Job Ended at `date`"
+echo " "
+
+
