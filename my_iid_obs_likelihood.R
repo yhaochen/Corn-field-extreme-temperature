@@ -33,7 +33,7 @@ log.lik <- function(p) # model.p is the dimension of model parameters
   
   sigma.y <- p[model.p+1] # sigma is the innovation variance
   
-  model.out <- model(par, yielddata[ ,2],yielddata[ ,5],yielddata[ ,6]) # run the model and name to output y.mod
+  model.out <- model(par, yielddata[ ,2],yielddata[ ,3],yielddata[ ,5],yielddata[ ,6]) # run the model and name to output y.mod
   y.mod <- model.out$mod.obs
   
   llik.y <- 0

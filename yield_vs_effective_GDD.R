@@ -7,8 +7,14 @@ library(coda)
 library(mcmc)
 library(batchmeans)
 library(spgs)
+library(ggplot2)
+library(bayesplot)
+library(RColorBrewer)
+library(gridExtra)
+library(RColorBrewer)
 
-textrm1<-as.matrix(read.table("USC00365915.dly",header=FALSE))
+
+textrm1<-as.matrix(read.table("HCN_data/USC00365915.dly",header=FALSE))
 row<-dim(textrm1)[1]
 col<-dim(textrm1)[2]
 textrm1<-textrm1[ ,2:col]
@@ -58,7 +64,7 @@ for (i in 18:28){
 }
 
 
-textrm2<-as.matrix(read.table("USC00367322.dly",header=FALSE))
+textrm2<-as.matrix(read.table("HCN_data/USC00367322.dly",header=FALSE))
 row<-dim(textrm2)[1]
 col<-dim(textrm2)[2]
 textrm2<-textrm2[ ,2:col]
@@ -108,7 +114,7 @@ for (i in 9:28){
 }
 
 
-textrm3<-as.matrix(read.table("USC00368449.dly",header=FALSE))
+textrm3<-as.matrix(read.table("HCN_data/USC00368449.dly",header=FALSE))
 row<-dim(textrm3)[1]
 col<-dim(textrm3)[2]
 textrm3<-textrm3[ ,2:col]
@@ -158,7 +164,7 @@ for (i in 22:28){
 }
 
 
-textrm4<-as.matrix(read.table("USC00369050.dly",header=FALSE))
+textrm4<-as.matrix(read.table("HCN_data/USC00369050.dly",header=FALSE))
 row<-dim(textrm4)[1]
 col<-dim(textrm4)[2]
 textrm4<-textrm4[ ,2:col]
@@ -220,7 +226,7 @@ for (i in 21:28){
   EDD4[i]<-sum(textrm4_edd[(12*(i-1)-3):(12*i-4), ], na.rm=TRUE)/2-29*184
 }
 
-textrm5<-as.matrix(read.table("USC00369298.dly",header=FALSE))
+textrm5<-as.matrix(read.table("HCN_data/USC00369298.dly",header=FALSE))
 row<-dim(textrm5)[1]
 col<-dim(textrm5)[2]
 textrm5<-textrm5[ ,2:col]
@@ -261,7 +267,7 @@ for (i in 1:28){  #EDD5 in each year
 
 
 
-yield<-as.matrix(read.table("yield.csv",header=FALSE,sep=",",skip = 1))
+yield<-as.matrix(read.table("yield_data/yield.csv",header=FALSE,sep=",",skip = 1))
 entireG<-rep(0,140) #growing degree days in each year, each station, unit in degree
 entireG[1:28]<-GDD1
 entireG[29:56]<-GDD2
@@ -388,14 +394,14 @@ model <- function(parm,w,x,y,z){ # Inputs are parameters and length of data
 
 observations <- yielddata[ ,1]
 parnames<-c("GDD","GDD_sqr","EDD","EDD_sqr","yield mean","sigma")
-set.seed(1)
+set.seed(128)
 #initial guess GDD, EDD, EDD^2, yield mean, sigma
 p0<-c(0.04,0,-0.35,-0.003,2,1)
 p<-c(0.04,0,-0.25,-0.004,1.5,0.8)
 # Load the likelihood model for measurement errors
 source("my_iid_obs_likelihood.R")
-step <- c(0.002, 0.00000001, 0.007, 0.0001, 0.16, 0.001)
-NI <- 5000
+step <- c(0.004, 0.0001, 0.04, 0.00022, 0.6, 0.4)
+NI <- 100000
 model.p<-5
 bound.lower<-c(-10,-5,-10,-5,-10,0)
 bound.upper<-c(10, 5, 5, 5, 10,100)
@@ -407,8 +413,8 @@ cat("Accept rate =", acceptrate, "%\n")
 # Identify the burn-in period and subtract it from the chains.
 burnin <- seq(1, 0.01*NI, 1)
 mcmc.chains <- prechain[-burnin, ]
-par(mfrow = c(2,2))
-for(i in 1:4){
+par(mfrow = c(2,3))
+for(i in 1:6){
   plot(mcmc.chains[ ,i], type="l", main = "",
        ylab = paste('Parameter = ', parnames[i], sep = ''), xlab = "Number of Runs")
 }
@@ -461,21 +467,24 @@ gelman.plot(mcmc_chain_list)
 mcmc1 <- as.mcmc(mcmc.chains)
 hpdi = HPDinterval(mcmc1, prob = 0.90)
 # Create density plot of each parameter.
-par(mfrow = c(2,2))
-for(i in 1:4){
+i=6
   # Create density plot.
   p.dens = density(mcmc.chains[,i])
+  layout(mat = matrix(c(1,2),2,1, byrow=TRUE),  height = c(1,8))
+  par(mar=c(0, 5.1, 1.1, 2.1))
+  boxplot(mcmc.chains[ ,i] , horizontal=TRUE , xaxt="n", frame=F,pch=20)
+  par(mar=c(4, 5.1, 1.1, 2.1))
   plot(p.dens, xlab = paste('Parameter =',' ', parnames[i], sep = ''), main="")
   # Add mean estimate.
-  abline(v = bm(mcmc.chains[,i])$est, lwd = 2)
+  abline(v = bm(mcmc.chains[,i])$est, lwd = 2,col="blue")
   # Add 90% equal-tail CI.
   CI = quantile(mcmc.chains[,i], prob = c(0.05, 0.95))
-  lines(x = CI, y = rep(0, 2), lwd = 2)
-  points(x = CI, y = rep(0, 2), pch = 16)
+  lines(x = CI, y = rep(0, 2), lwd = 2,col="violet")
+  points(x = CI, y = rep(0, 2), pch = 16,col="violet")
   # Add 90% highest posterior density CI.
   lines(x = hpdi[i, ], y = rep(mean(p.dens$y), 2), lwd = 2, col = "red")
   points(x = hpdi[i, ], y = rep(mean(p.dens$y), 2), pch = 16, col = "red")
-}
+legend("topleft",lwd = c(1,2,2,2),col=c("black","violet","red","blue"),legend = c("posterior distribution","90% equal-tail CI","90% highest posterior density CI","mean estimation"))
 
 true_model<-bm_est[1, 1]*yielddata[ ,2]+bm_est[2,1]*yielddata[ ,3]+bm_est[3,1]*yielddata[ ,5]+bm_est[4,1]*yielddata[6]+bm_est[5,1]
 res<-yielddata[ ,1]-true_model
@@ -485,3 +494,29 @@ x<-seq(-40,40,length=801)
 y<-dnorm(x,0.08185,14.45153)
 lines(x,y,col="red")
 shapiro.test(res[ ,1])
+
+#colnames(mcmc.chains)<-parnames
+#color_scheme_set("red")
+#p2 <- mcmc_scatter(mcmc.chains, pars = c("GDD", "EDD"), pch=".",size = 3.5, alpha = 0.25)
+#p2 + stat_density_2d(color = "black", size = .5)
+
+#my.cols <- rev(brewer.pal(11, "RdBu"))
+#z <- kde2d(mcmc.chains[ ,1], mcmc.chains[ ,3], n=50) #which 2 variables?
+#plot(mcmc.chains[ ,1],mcmc.chains[ ,3], xlab="GDD", ylab="EDD", pch="20",cex=0.2, col="gray")
+#contour(z, drawlabels=FALSE, nlevels=k, col=my.cols, lwd=3, add=TRUE)
+
+modelyield<-matrix(0, nrow = 112, ncol = 10000)
+for (i in 1:112){
+     for (j in 1:10000){
+         modelyield[i,j]<-model(c(mcmc1[j+10000,1],mcmc1[j+10000,2],mcmc1[j+10000,3],mcmc1[j+10000,4],mcmc1[j+10000,5]),yielddata[i,2],yielddata[i,3],yielddata[i,5],yielddata[i,6])$mod.obs+rnorm(1,0,mcmc1[j+10000,6])
+     }
+}
+boundyield<-matrix(0,nrow = 112,ncol = 2)
+for (i in 1:112){
+     a<-quantile(modelyield[i, ],probs = c(0.05,0.95))
+    boundyield[i,1]<-a[1]
+    boundyield[i,2]<-a[2]
+}
+plot(c(1980:2007),yield_anomaly[1:28],pch=20,xlab = "year",ylab = "yield (bu/acre)")
+lines(c(1980:2007),boundyield[1:28,1])
+lines(c(1980:2007),boundyield[1:28,2])

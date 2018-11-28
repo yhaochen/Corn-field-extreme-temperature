@@ -1,0 +1,9 @@
+/var/spool/torque/mom_priv/jobs/7793650.torque01.util.production.int.aci.ics.psu.edu.SC: line 11: cd: /storage/home/hxy46/work/Workshop/: No such file or directory
+ 
+ 
+Job started on comp-bc-0360.acib.production.int.aci.ics.psu.edu at Fri Oct 19 16:37:32 EDT 2018
+Fatal error: cannot open file 'Test.R': No such file or directory
+/var/spool/torque/mom_priv/jobs/7793650.torque01.util.production.int.aci.ics.psu.edu.SC: line 19: STOP: command not found
+ 
+Job Ended at Fri Oct 19 16:37:32 EDT 2018
+ 

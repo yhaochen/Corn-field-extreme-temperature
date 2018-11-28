@@ -7,7 +7,6 @@
 #PBS -A open
 
 
-cd /storage/home/hxy46/work/Workshop/
 echo " "
 echo " "
 echo "Job started on `hostname` at `date`"
